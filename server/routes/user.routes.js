@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { loginUser, logoutUser, registerUser, getCurrUser } from "../controllers/user.controllers.js";
+import { loginUser, logoutUser, registerUser, getCurrUser, searchUsers } from "../controllers/user.controllers.js";
 import { verifyJwt } from "../middlewares/auth.middleware.js";
 
 const router = Router();
@@ -10,7 +10,7 @@ router.post("/register", registerUser);
 //another way to define routes
 router.route("/register").post(registerUser);
 router.route("/login").post(loginUser);
-
+router.route('/search').get(searchUsers)
 // protected routes
 router.route("/logout").post(verifyJwt, logoutUser)
 router.route("/me").get(verifyJwt, getCurrUser);

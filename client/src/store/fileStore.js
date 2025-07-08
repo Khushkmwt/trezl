@@ -57,6 +57,22 @@ const useFileStore = create((set, get) => ({
   console.log(res)
     fetchFolder(currentFolderId);
   },
+
+  deleteFolder: async (folderId) => {
+    const { currentFolderId ,fetchFolder} = get();
+   const res = await API.delete(`/folders/${folderId}`)
+   fetchFolder(currentFolderId);
+
+  },
+  renameFolder: async (folderId,foldername) => {
+    const res = await API.patch(`/folders/${folderId}`,{foldername})
+    const { currentFolderId , fetchFolder} = get();
+    fetchFolder(currentFolderId)
+  },
+  shareFolder: async (folderId, users) => {
+    // console.log(users)
+   const res = await API.post(`/folders/share/${folderId}`,{users})
+  },
 }));
 
 export default useFileStore;

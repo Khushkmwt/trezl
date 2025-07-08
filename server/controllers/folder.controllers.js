@@ -3,8 +3,20 @@ import {ApiError} from "../utils/ApiError.js"
 import {Response} from "../utils/Response.js"
 import { User } from "../models/user.model.js";
 import { TrezlFolder } from "../models/folder.model.js";
+import { TrezlFile } from "../models/file.model.js";
 
-
+const deleteFolderDeep = async (folderId,userId) => {
+  if (!folderId) {
+    throw new ApiError(400, "FolderId is required")
+  }
+   await TrezlFile.deleteMany({userId,folderId})
+   const folders = await TrezlFolder.find({userId, parentFolder:folderId})
+   for(const folder of folders){
+     await deleteFolderDeep(folder._id,userId);
+   }
+   
+   await TrezlFolder.findByIdAndDelete(folderId)
+}
 // Create folder at root or whithin folder 
 export const createFolder = asyncWrapper(async (req, res) => {
   const { foldername, parentFolder } = req.body;
@@ -103,19 +115,14 @@ export const deleteFolder = asyncWrapper(async (req, res) => {
       throw new ApiError(404, "Folder does not exist");
     }
     
-   // for now only
-    if ((folder.files?.length || 0) > 0 || (folder.subFolders?.length || 0) > 0) {
-     throw new ApiError(400, "Folder must be empty before deletion");
-    }  
-
-
-    const deletedFolder = await TrezlFolder.findByIdAndDelete(folder._id)
-    if (!deletedFolder) {
-      throw new ApiError(404, "Folder deletion failed");
-    }
+   try {
+     await deleteFolderDeep(folderId, userId)
+   } catch (error) {
+     throw new ApiError(500, "deletion failed")
+   }
 
     res.status(200).json(
-        new Response(200, deletedFolder, "Folder deleted successfully")
+        new Response(200, folder, "Folder deleted successfully")
     )
 })
 
@@ -145,3 +152,52 @@ export const getFolder = asyncWrapper(async(req, res) => {
     )
   )
 })
+
+export const shareFolder = asyncWrapper(async (req, res) => {
+  const { users } = req.body;
+  const { folderId } = req.params;
+  const userId = req.user?._id;
+
+  if (!folderId) throw new ApiError(400, "Folder ID is required");
+  if (!Array.isArray(users) || users.length === 0) {
+    throw new ApiError(400, "At least one user must be provided");
+  }
+
+  // ✅ Fetch folder owned by current user
+  const folder = await TrezlFolder.findOne({ _id: folderId, userId });
+  if (!folder) throw new ApiError(404, "Folder not found");
+
+  // ✅ Validate user IDs
+  const userIds = users.map((u) => u.userId);
+  const validUsers = await User.find({ _id: { $in: userIds } });
+
+  const validUserSet = new Set(validUsers.map((u) => u._id.toString()));
+
+  // ✅ Filter valid & non-duplicate users
+  const existingSharedIds = new Set(
+    (folder.sharedWith || []).map((entry) => entry.userId.toString())
+  );
+
+  const newSharedUsers = users
+    .filter(
+      (u) =>
+        validUserSet.has(u.userId.toString()) &&
+        !existingSharedIds.has(u.userId.toString())
+    )
+    .map((u) => ({
+      userId: u.userId,
+      permission: u.permission || "view",
+    }));
+
+  if (newSharedUsers.length === 0) {
+    throw new ApiError(400, "No new valid users to share with");
+  }
+
+  // ✅ Push non-duplicate entries
+  folder.sharedWith.push(...newSharedUsers);
+  await folder.save();
+
+  res
+    .status(201)
+    .json(new Response(201, folder, "Folder shared successfully"));
+});

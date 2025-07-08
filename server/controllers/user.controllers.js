@@ -146,3 +146,17 @@ export const getCurrUser = asyncWrapper(async (req, res) => {
     )
 })
 
+
+//get all user by searchterm 
+export const searchUsers = asyncWrapper(async (req, res) => {
+    const searchTerm = req.query.searchTerm
+    if (!searchTerm) {
+        throw new ApiError(400, "SearchTerm is required")
+    }
+    const users = await User.find({fullname : searchTerm}).select("-password -refreshToken")
+    
+
+    res.status(201).json(
+        new Response(201, users, "Searched successfully")
+    )
+})

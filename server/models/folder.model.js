@@ -33,8 +33,16 @@ const folderSchema = new mongoose.Schema({
     ref:"TrezlFile",
   }],
   sharedWith : [{
-    type : mongoose.Schema.Types.ObjectId,
-    ref : "User"
+    userId : {
+          type : mongoose.Schema.Types.ObjectId,
+          ref : "User",
+    },
+    accessType:{
+          type : String,
+          required: true,
+          enum :["view", "edit"],
+          default : "view",
+    }
   }]
 },{timestamps:true});
 
